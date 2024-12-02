@@ -1,8 +1,14 @@
+use std::collections::VecDeque;
+
 use crate::error_template::{AppError, ErrorTemplate};
 
+use crate::server_fn::codec::StreamingText;
+use futures::{stream, StreamExt};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use logging::log;
+use server_fn::codec::TextStream;
 
 pub mod error_template;
 
@@ -25,22 +31,80 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="" view=HomePage/>
+                    <Route path="" view=StreamExample/>
                 </Routes>
             </main>
         </Router>
     }
 }
 
-/// Renders the home page of your application.
 #[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
+pub fn StreamExample() -> impl IntoView {
+    let (is_streaming, set_is_streaming) = create_signal(false);
+
+    let start_stream = move |_| {
+        set_is_streaming.set(true);
+    };
+
+    let (data, set_data) = create_signal(vec![]);
+
+    create_effect(move |_| {
+        if is_streaming.get() {
+            spawn_local(async move {
+                let stream_future = async {
+                    let mut stream = stream_data().await.unwrap().into_inner();
+
+                    while let Some(item) = stream.next().await {
+                        let result = item.unwrap();
+                        log!("RESULT: {:?}", result);
+                        set_data.update(|data| data.push(result));
+                    }
+                };
+
+                stream_future.await;
+            });
+        }
+    });
 
     view! {
-        <h1>"Welcome to Leptos!"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
+        <div>
+            <button on:click=start_stream>
+                "Start Stream"
+            </button>
+
+            {move || if is_streaming.get() {
+                view! {
+                    <div>
+                        <p>"Receiving data from server..."</p>
+                        <ul>
+                            <For each=move || data.get() key=|item| item.to_string() children=|item| view! {
+                                <li>{item}</li>
+                            }/>
+                        </ul>
+                    </div>
+                }
+            } else {
+                view! {
+                    <div>"Press button to start stream"</div>
+                }
+            }}
+        </div>
     }
+}
+
+#[server(output = StreamingText)]
+pub async fn stream_data() -> Result<TextStream, ServerFnError> {
+    let vec = VecDeque::from(vec![1, 2, 3]);
+    let result = stream::unfold(vec, |mut vec| async move {
+        if let Some(item) = vec.pop_front() {
+            log!("ITEM: {:?}", item);
+            Some((Ok(item.to_string()), vec))
+        } else {
+            None
+        }
+    });
+
+    Ok(TextStream::new(result.map(|result| {
+        Ok(result.unwrap_or_else(|_: ServerFnError| "".to_string()))
+    })))
 }
