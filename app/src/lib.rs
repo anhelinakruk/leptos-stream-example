@@ -9,8 +9,10 @@ use leptos_meta::*;
 use leptos_router::*;
 use logging::log;
 use server_fn::codec::TextStream;
+use session::Demo;
 
 pub mod error_template;
+pub mod session;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -18,20 +20,21 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/start-axum-workspace.css"/>
+        <Stylesheet id="leptos" href="/pkg/start-axum-workspace.css" />
 
         // sets the document title
-        <Title text="Welcome to Leptos"/>
+        <Title text="Welcome to Leptos" />
 
         // content for this welcome page
         <Router fallback=|| {
             let mut outside_errors = Errors::default();
             outside_errors.insert_with_default_key(AppError::NotFound);
-            view! { <ErrorTemplate outside_errors/> }.into_view()
+            view! { <ErrorTemplate outside_errors /> }.into_view()
         }>
             <main>
                 <Routes>
-                    <Route path="" view=StreamExample/>
+                    <Route path="" view=StreamExample />
+                    <Route path="/session" view=Demo />
                 </Routes>
             </main>
         </Router>
@@ -68,24 +71,24 @@ pub fn StreamExample() -> impl IntoView {
 
     view! {
         <div>
-            <button on:click=start_stream>
-                "Start Stream"
-            </button>
+            <button on:click=start_stream>"Start Stream"</button>
 
-            {move || if is_streaming.get() {
-                view! {
-                    <div>
-                        <p>"Receiving data from server..."</p>
-                        <ul>
-                            <For each=move || data.get() key=|item| item.to_string() children=|item| view! {
-                                <li>{item}</li>
-                            }/>
-                        </ul>
-                    </div>
-                }
-            } else {
-                view! {
-                    <div>"Press button to start stream"</div>
+            {move || {
+                if is_streaming.get() {
+                    view! {
+                        <div>
+                            <p>"Receiving data from server..."</p>
+                            <ul>
+                                <For
+                                    each=move || data.get()
+                                    key=|item| item.to_string()
+                                    children=|item| view! { <li>{item}</li> }
+                                />
+                            </ul>
+                        </div>
+                    }
+                } else {
+                    view! { <div>"Press button to start stream"</div> }
                 }
             }}
         </div>

@@ -1,6 +1,9 @@
 use app::*;
+use component::Component;
 use leptos::*;
 use wasm_bindgen::prelude::wasm_bindgen;
+
+pub mod component;
 
 #[wasm_bindgen]
 pub fn hydrate() {
